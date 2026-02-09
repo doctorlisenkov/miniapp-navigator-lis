@@ -13,9 +13,7 @@
       background: #020617;
       color: #e5e7eb;
     }
-    h1, h2 {
-      margin-top: 0;
-    }
+    h1, h2 { margin-top: 0; }
     .card {
       background: #020617;
       border: 1px solid #1e293b;
@@ -24,49 +22,40 @@
       margin-bottom: 12px;
       cursor: pointer;
     }
-    .card:hover {
-      border-color: #38bdf8;
-    }
-    .subtitle {
-      opacity: 0.7;
-      font-size: 14px;
-    }
-    .back {
-      margin-bottom: 16px;
-      cursor: pointer;
-      color: #38bdf8;
-    }
-    ul {
-      padding-left: 18px;
-    }
-    li {
-      margin-bottom: 8px;
-    }
+    .card:hover { border-color: #38bdf8; }
+    .subtitle { opacity: 0.7; font-size: 14px; }
+    .back { margin-bottom: 16px; cursor: pointer; color: #38bdf8; }
+    ul { padding-left: 18px; }
+    li { margin-bottom: 10px; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted { opacity: .7; }
   </style>
 </head>
 <body>
 
-<div id="app"></div>
+<div id="app">Загрузка...</div>
 
 <script>
+  let DATA = null;
+
+  async function loadData() {
+    const res = await fetch("./data.json", { cache: "no-store" });
+    DATA = await res.json();
+    document.title = DATA.appTitle || "Навигатор пути";
+  }
+
   function renderHome() {
+    const seasonsHtml = DATA.seasons.map(s => `
+      <div class="card" onclick="openSeason(${s.id})">
+        <strong>${s.title}</strong><br>
+        <span class="subtitle">${s.subtitle || ""}</span>
+      </div>
+    `).join("");
+
     document.getElementById("app").innerHTML = `
-      <h1>Навигатор пути</h1>
-
-      <div class="card" onclick="openSeason(1)">
-        <strong>СЕЗОН 1. ПРОБУЖДЕНИЕ</strong><br>
-        <span class="subtitle">Посмотри на себя честно</span>
-      </div>
-
-      <div class="card" onclick="openSeason(2)">
-        <strong>СЕЗОН 2. ИДЕНТИЧНОСТЬ</strong><br>
-        <span class="subtitle">Пойми кто ты</span>
-      </div>
-
-      <div class="card" onclick="openSeason(3)">
-        <strong>СЕЗОН 3. БОЛЬ КАК ПЕТЛЯ</strong><br>
-        <span class="subtitle">Хождение по кругу</span>
-      </div>
+      <h1>${DATA.appTitle || "Навигатор пути"}</h1>
+      ${seasonsHtml}
     `;
   }
 
@@ -76,42 +65,29 @@
   }
 
   function renderSeason(id) {
-    let content = "";
-
-    if (id === 1) {
-      content = `
-        <h2>СЕЗОН 1. ПРОБУЖДЕНИЕ</h2>
-        <ul>
-          <li>Честный путь</li>
-          <li>Чтобы что-то изменить</li>
-          <li>Вина и стыд</li>
-        </ul>
-      `;
+    const season = DATA.seasons.find(s => s.id === id);
+    if (!season) {
+      location.hash = "";
+      return renderHome();
     }
 
-    if (id === 2) {
-      content = `
-        <h2>СЕЗОН 2. ИДЕНТИЧНОСТЬ</h2>
-        <ul>
-          <li>Кто я без ролей</li>
-          <li>Опора на себя</li>
-        </ul>
+    const itemsHtml = season.items.map(item => {
+      const hasLink = item.link && item.link.trim().length > 0;
+      return `
+        <li>
+          ${hasLink
+            ? `<a href="${item.link}" target="_blank" rel="noopener">${item.title}</a>`
+            : `${item.title} <span class="muted">(ссылка позже)</span>`
+          }
+        </li>
       `;
-    }
-
-    if (id === 3) {
-      content = `
-        <h2>СЕЗОН 3. БОЛЬ КАК ПЕТЛЯ</h2>
-        <ul>
-          <li>Повторяющийся сценарий</li>
-          <li>Выход из круга</li>
-        </ul>
-      `;
-    }
+    }).join("");
 
     document.getElementById("app").innerHTML = `
       <div class="back" onclick="goBack()">← Все сезоны</div>
-      ${content}
+      <h2>${season.title}</h2>
+      <div class="subtitle" style="margin-bottom:12px">${season.subtitle || ""}</div>
+      <ul>${itemsHtml}</ul>
     `;
   }
 
@@ -120,13 +96,27 @@
     renderHome();
   }
 
-  // Инициализация
-  if (location.hash.startsWith("#season")) {
-    const id = Number(location.hash.replace("#season", ""));
-    renderSeason(id);
-  } else {
-    renderHome();
+  async function init() {
+    await loadData();
+
+    if (location.hash.startsWith("#season")) {
+      const id = Number(location.hash.replace("#season", ""));
+      renderSeason(id);
+    } else {
+      renderHome();
+    }
+
+    window.addEventListener("hashchange", () => {
+      if (location.hash.startsWith("#season")) {
+        const id = Number(location.hash.replace("#season", ""));
+        renderSeason(id);
+      } else {
+        renderHome();
+      }
+    });
   }
+
+  init();
 </script>
 
 </body>
