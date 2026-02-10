@@ -45,7 +45,18 @@
       gap:14px;
       margin-bottom: 18px;
     }
-
+    .topbar::after{
+  content:"";
+  display:block;
+  height:1px;
+  margin-top:16px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,.18),
+    transparent
+  );
+}
     .brand{
       display:flex;
       flex-direction:column;
@@ -54,20 +65,31 @@
     }
 
     .brandTitle{
-      margin:0;
-      font-size: 28px;
-      letter-spacing: .2px;
-      line-height: 1.05;
-    }
+  margin:0;
+  font-size: 28px;
+  letter-spacing: .2px;
+  line-height: 1.05;
+
+  background: linear-gradient(
+    135deg,
+    #f8fafc 0%,
+    #e0e7ff 40%,
+    #c7d2fe 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 
     .brandTitle span{
-      display:block;
-      margin-top: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: .2px;
-      color: var(--muted);
-    }
+  display:block;
+  margin-top: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: .35px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 
     .hint{
       margin-top:0;
