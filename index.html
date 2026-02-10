@@ -39,24 +39,31 @@
 
     /* TOPBAR / HEADER */
     .topbar{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:14px;
-      margin-bottom: 18px;
-    }
-    .topbar::after{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom: 18px;
+
+  position: relative;      /* ← ВАЖНО */
+  padding-bottom: 16px;    /* ← место под линию */
+}
+   .topbar::after{
   content:"";
-  display:block;
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
   height:1px;
-  margin-top:16px;
   background: linear-gradient(
     90deg,
     transparent,
     rgba(255,255,255,.18),
     transparent
   );
+  pointer-events:none;
 }
+
     .brand{
       display:flex;
       flex-direction:column;
