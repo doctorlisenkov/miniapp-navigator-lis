@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Навигатор пути</title>
+  <title>Мария Богиня — подкасты</title>
 
   <style>
     :root{
@@ -11,8 +11,6 @@
       --bg2:#0b1227;
       --stroke: rgba(255,255,255,.10);
       --stroke2: rgba(255,255,255,.16);
-      --glass: rgba(255,255,255,.06);
-      --glass2: rgba(255,255,255,.10);
       --text:#e5e7eb;
       --muted: rgba(229,231,235,.70);
       --accent: rgba(56,189,248,.95);
@@ -37,32 +35,45 @@
 
     .wrap{ max-width: 980px; margin: 0 auto; }
 
+    /* PAGE FADE */
+    .page{
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity .22s ease, transform .22s ease;
+      will-change: opacity, transform;
+    }
+    .page.show{
+      opacity: 1;
+      transform: translateY(0);
+    }
+
     /* TOPBAR / HEADER */
     .topbar{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:14px;
-  margin-bottom: 18px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      margin-bottom: 18px;
 
-  position: relative;      /* ← ВАЖНО */
-  padding-bottom: 16px;    /* ← место под линию */
-}
-   .topbar::after{
-  content:"";
-  position:absolute;
-  left:0;
-  right:0;
-  bottom:0;
-  height:1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255,255,255,.18),
-    transparent
-  );
-  pointer-events:none;
-}
+      position: relative;      /* важно для ::after */
+      padding-bottom: 16px;    /* место под линию */
+    }
+    .topbar::after{
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:0;
+      height:1px;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,.22),
+        transparent
+      );
+      box-shadow: 0 0 18px rgba(255,255,255,.08);
+      pointer-events:none;
+    }
 
     .brand{
       display:flex;
@@ -72,31 +83,31 @@
     }
 
     .brandTitle{
-  margin:0;
-  font-size: 28px;
-  letter-spacing: .2px;
-  line-height: 1.05;
+      margin:0;
+      font-size: 28px;
+      letter-spacing: .2px;
+      line-height: 1.05;
 
-  background: linear-gradient(
-    135deg,
-    #f8fafc 0%,
-    #e0e7ff 40%,
-    #c7d2fe 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+      background: linear-gradient(
+        135deg,
+        #f8fafc 0%,
+        #e0e7ff 40%,
+        #c7d2fe 100%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
 
     .brandTitle span{
-  display:block;
-  margin-top: 6px;
-  font-size: 13.5px;
-  font-weight: 600;
-  letter-spacing: .35px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+      display:block;
+      margin-top: 6px;
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: .35px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
 
     .hint{
       margin-top:0;
@@ -126,7 +137,7 @@
       font-weight: 800;
     }
 
-    /* GRID: 2 колонки на широких, 1 колонка на мобиле */
+    /* GRID: 2 колонки на широких, 1 на мобиле */
     .grid{
       display:grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -153,8 +164,11 @@
       -webkit-backdrop-filter: blur(14px);
       cursor:pointer;
       overflow:hidden;
-      transition: transform .16s ease, border-color .16s ease, background .16s ease;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease, filter .16s ease;
       min-height: 92px;
+      outline: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .card::before{
@@ -183,8 +197,14 @@
       background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.05));
     }
 
+    /* АНИМАЦИЯ НАЖАТИЯ */
     .card:active{
-      transform: translateY(0px) scale(.995);
+      transform: translateY(0px) scale(.985);
+      filter: brightness(1.05);
+    }
+    .card.pressing{
+      transform: translateY(0px) scale(.985);
+      filter: brightness(1.05);
     }
 
     .title{
@@ -192,7 +212,7 @@
       letter-spacing: .2px;
       line-height: 1.15;
       font-size: 16px;
-      padding-right: 48px; /* чтобы заголовок не залезал под badge */
+      padding-right: 48px; /* чтобы не залезало под badge */
     }
 
     .subtitle{
@@ -304,6 +324,12 @@
       font-size: 14px;
       padding: 14px;
     }
+
+    /* Accessibility: если человек отключил анимации */
+    @media (prefers-reduced-motion: reduce){
+      .page, .card{ transition:none; }
+      .page{ transform:none; }
+    }
   </style>
 </head>
 
@@ -321,16 +347,26 @@
     document.title = "Мария Богиня — подкасты";
   }
 
+  function mountWithFade(html) {
+    const app = document.getElementById("app");
+    app.innerHTML = `<div class="page" id="page">${html}</div>`;
+    // дать браузеру применить DOM, затем включить show
+    requestAnimationFrame(() => {
+      const page = document.getElementById("page");
+      if (page) page.classList.add("show");
+    });
+  }
+
   function renderHome() {
     const seasonsHtml = DATA.seasons.map(s => `
-      <div class="card" onclick="openSeason(${s.id})" role="button" tabindex="0">
+      <div class="card" data-season="${s.id}" role="button" tabindex="0" aria-label="${s.title}">
         <div class="badge">${(s.items && s.items.length) ? s.items.length : 0}</div>
         <div class="title">${s.title}</div>
         <div class="subtitle">${s.subtitle || ""}</div>
       </div>
     `).join("");
 
-    document.getElementById("app").innerHTML = `
+    const html = `
       <div class="topbar">
         <div class="brand">
           <h1 class="brandTitle">Мария Богиня<span>подкасты</span></h1>
@@ -344,11 +380,37 @@
         ${seasonsHtml}
       </div>
     `;
+
+    mountWithFade(html);
+    wireHomeCardEvents();
   }
 
-  function openSeason(id) {
-    location.hash = "season" + id;
-    renderSeason(id);
+  function wireHomeCardEvents() {
+    // клики + поддержка enter/space + “press” эффект перед переходом
+    document.querySelectorAll(".card[data-season]").forEach(card => {
+      const id = Number(card.getAttribute("data-season"));
+
+      const go = () => openSeason(id, card);
+
+      card.addEventListener("click", go);
+
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          go();
+        }
+      });
+    });
+  }
+
+  function openSeason(id, cardEl) {
+    // небольшой press-эффект и затем переход
+    if (cardEl) cardEl.classList.add("pressing");
+    setTimeout(() => {
+      if (cardEl) cardEl.classList.remove("pressing");
+      location.hash = "#season" + id;   // важно: с #
+      renderSeason(id);
+    }, 110);
   }
 
   function renderSeason(id) {
@@ -370,7 +432,7 @@
       `;
     }).join("");
 
-    document.getElementById("app").innerHTML = `
+    const html = `
       <div class="back" onclick="goBack()">← Все сезоны</div>
 
       <div class="seasonHead">
@@ -382,6 +444,8 @@
         ${itemsHtml || `<div class="empty">Пока нет пунктов.</div>`}
       </div>
     `;
+
+    mountWithFade(html);
   }
 
   function goBack() {
