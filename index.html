@@ -35,16 +35,16 @@
 
     .wrap{ max-width: 980px; margin: 0 auto; }
 
-    /* PAGE FADE */
-    .page{
-      opacity: 0;
-      transform: translateY(6px);
+    /* ---------- PAGE TRANSITIONS ---------- */
+    #app{
+      opacity: 1;
+      transform: translateY(0);
       transition: opacity .22s ease, transform .22s ease;
       will-change: opacity, transform;
     }
-    .page.show{
-      opacity: 1;
-      transform: translateY(0);
+    #app.is-leaving{
+      opacity: 0;
+      transform: translateY(6px);
     }
 
     /* TOPBAR / HEADER */
@@ -55,8 +55,8 @@
       gap:14px;
       margin-bottom: 18px;
 
-      position: relative;      /* важно для ::after */
-      padding-bottom: 16px;    /* место под линию */
+      position: relative;
+      padding-bottom: 16px;
     }
     .topbar::after{
       content:"";
@@ -68,10 +68,9 @@
       background: linear-gradient(
         90deg,
         transparent,
-        rgba(255,255,255,.28),
+        rgba(255,255,255,.18),
         transparent
       );
-      box-shadow: 0 0 18px rgba(255,255,255,.08);
       pointer-events:none;
     }
 
@@ -88,12 +87,7 @@
       letter-spacing: .2px;
       line-height: 1.05;
 
-      background: linear-gradient(
-        135deg,
-        #f8fafc 0%,
-        #e0e7ff 40%,
-        #c7d2fe 100%
-      );
+      background: linear-gradient(135deg,#f8fafc 0%,#e0e7ff 40%,#c7d2fe 100%);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
@@ -131,13 +125,12 @@
       line-height: 1.35;
       max-width: 420px;
     }
-
     .pill b{
       color: rgba(229,231,235,.92);
       font-weight: 800;
     }
 
-    /* GRID: 2 колонки на широких, 1 на мобиле */
+    /* GRID: 2 колонки на широких, 1 колонка на мобиле */
     .grid{
       display:grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -164,13 +157,13 @@
       -webkit-backdrop-filter: blur(14px);
       cursor:pointer;
       overflow:hidden;
-      transition: transform .16s ease, border-color .16s ease, background .16s ease, filter .16s ease;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease;
       min-height: 92px;
-      outline: none;
-      user-select: none;
+      user-select:none;
       -webkit-tap-highlight-color: transparent;
     }
 
+    /* лёгкий "внутренний блик" */
     .card::before{
       content:"";
       position:absolute;
@@ -181,7 +174,6 @@
       opacity: .7;
       pointer-events:none;
     }
-
     .card::after{
       content:"";
       position:absolute;
@@ -197,14 +189,24 @@
       background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.05));
     }
 
-    /* АНИМАЦИЯ НАЖАТИЯ */
+    /* микро-анимация клика */
     .card:active{
       transform: translateY(0px) scale(.985);
-      filter: brightness(1.05);
     }
-    .card.pressing{
+    .card.is-pressed{
       transform: translateY(0px) scale(.985);
-      filter: brightness(1.05);
+      border-color: var(--stroke2);
+    }
+
+    /* появление карточек каскадом */
+    .card{
+      opacity: 0;
+      transform: translateY(10px);
+      animation: cardIn .35s ease forwards;
+      animation-delay: var(--d, 0ms);
+    }
+    @keyframes cardIn{
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .title{
@@ -212,7 +214,7 @@
       letter-spacing: .2px;
       line-height: 1.15;
       font-size: 16px;
-      padding-right: 48px; /* чтобы не залезало под badge */
+      padding-right: 48px; /* чтобы заголовок не залезал под badge */
     }
 
     .subtitle{
@@ -252,6 +254,7 @@
       color: rgba(56,189,248,.95);
       font-weight: 700;
       user-select:none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .seasonHead{
@@ -296,9 +299,17 @@
       align-items:center;
       justify-content:space-between;
       gap:12px;
-    }
 
+      opacity: 0;
+      transform: translateY(8px);
+      animation: rowIn .28s ease forwards;
+      animation-delay: var(--d, 0ms);
+    }
     .row:first-child{ border-top:none; }
+
+    @keyframes rowIn{
+      to { opacity: 1; transform: translateY(0); }
+    }
 
     .rowTitle{
       font-size: 14.5px;
@@ -316,19 +327,12 @@
       text-decoration:none;
       font-weight:700;
     }
-
     a:hover{ text-decoration: underline; }
 
     .empty{
       color: var(--muted);
       font-size: 14px;
       padding: 14px;
-    }
-
-    /* Accessibility: если человек отключил анимации */
-    @media (prefers-reduced-motion: reduce){
-      .page, .card{ transition:none; }
-      .page{ transform:none; }
     }
   </style>
 </head>
@@ -341,32 +345,42 @@
 <script>
   let DATA = null;
 
+  const TRANSITION_MS = 220;
+
   async function loadData() {
     const res = await fetch("./data.json", { cache: "no-store" });
     DATA = await res.json();
     document.title = "Мария Богиня — подкасты";
   }
 
-  function mountWithFade(html) {
+  function setApp(html) {
     const app = document.getElementById("app");
-    app.innerHTML = `<div class="page" id="page">${html}</div>`;
-    // дать браузеру применить DOM, затем включить show
-    requestAnimationFrame(() => {
-      const page = document.getElementById("page");
-      if (page) page.classList.add("show");
-    });
+    app.innerHTML = html;
+  }
+
+  function transitionTo(renderFn) {
+    const app = document.getElementById("app");
+    app.classList.add("is-leaving");
+
+    window.setTimeout(() => {
+      renderFn();
+      // принудительный reflow, чтобы анимация точно стартанула
+      void app.offsetHeight;
+      app.classList.remove("is-leaving");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, TRANSITION_MS);
   }
 
   function renderHome() {
-    const seasonsHtml = DATA.seasons.map(s => `
-      <div class="card" data-season="${s.id}" role="button" tabindex="0" aria-label="${s.title}">
+    const seasonsHtml = DATA.seasons.map((s, i) => `
+      <div class="card" style="--d:${i*35}ms" onclick="openSeason(${s.id}, event)" role="button" tabindex="0">
         <div class="badge">${(s.items && s.items.length) ? s.items.length : 0}</div>
         <div class="title">${s.title}</div>
         <div class="subtitle">${s.subtitle || ""}</div>
       </div>
     `).join("");
 
-    const html = `
+    setApp(`
       <div class="topbar">
         <div class="brand">
           <h1 class="brandTitle">Мария Богиня<span>подкасты</span></h1>
@@ -379,38 +393,19 @@
       <div class="grid">
         ${seasonsHtml}
       </div>
-    `;
-
-    mountWithFade(html);
-    wireHomeCardEvents();
+    `);
   }
 
-  function wireHomeCardEvents() {
-    // клики + поддержка enter/space + “press” эффект перед переходом
-    document.querySelectorAll(".card[data-season]").forEach(card => {
-      const id = Number(card.getAttribute("data-season"));
+  function openSeason(id, ev) {
+    // микро-нажатие на карточку (особенно заметно на мобиле)
+    const card = ev?.currentTarget;
+    if (card) {
+      card.classList.add("is-pressed");
+      window.setTimeout(() => card.classList.remove("is-pressed"), 120);
+    }
 
-      const go = () => openSeason(id, card);
-
-      card.addEventListener("click", go);
-
-      card.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          go();
-        }
-      });
-    });
-  }
-
-  function openSeason(id, cardEl) {
-    // небольшой press-эффект и затем переход
-    if (cardEl) cardEl.classList.add("pressing");
-    setTimeout(() => {
-      if (cardEl) cardEl.classList.remove("pressing");
-      location.hash = "#season" + id;   // важно: с #
-      renderSeason(id);
-    }, 110);
+    location.hash = "season" + id;
+    transitionTo(() => renderSeason(id));
   }
 
   function renderSeason(id) {
@@ -420,10 +415,10 @@
       return renderHome();
     }
 
-    const itemsHtml = (season.items || []).map(item => {
+    const itemsHtml = (season.items || []).map((item, i) => {
       const hasLink = item.link && item.link.trim().length > 0;
       return `
-        <div class="row">
+        <div class="row" style="--d:${i*25}ms">
           <div class="rowTitle">${item.title}</div>
           <div class="rowMeta">
             ${hasLink ? `<a href="${item.link}" target="_blank" rel="noopener">Открыть</a>` : `ссылка позже`}
@@ -432,7 +427,7 @@
       `;
     }).join("");
 
-    const html = `
+    setApp(`
       <div class="back" onclick="goBack()">← Все сезоны</div>
 
       <div class="seasonHead">
@@ -443,14 +438,12 @@
       <div class="list">
         ${itemsHtml || `<div class="empty">Пока нет пунктов.</div>`}
       </div>
-    `;
-
-    mountWithFade(html);
+    `);
   }
 
   function goBack() {
     location.hash = "";
-    renderHome();
+    transitionTo(() => renderHome());
   }
 
   async function init() {
@@ -466,9 +459,9 @@
     window.addEventListener("hashchange", () => {
       if (location.hash.startsWith("#season")) {
         const id = Number(location.hash.replace("#season", ""));
-        renderSeason(id);
+        transitionTo(() => renderSeason(id));
       } else {
-        renderHome();
+        transitionTo(() => renderHome());
       }
     });
   }
