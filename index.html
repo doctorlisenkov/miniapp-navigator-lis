@@ -37,40 +37,64 @@
 
     .wrap{ max-width: 980px; margin: 0 auto; }
 
+    /* TOPBAR / HEADER */
     .topbar{
       display:flex;
       align-items:flex-start;
       justify-content:space-between;
-      gap:12px;
+      gap:14px;
       margin-bottom: 18px;
     }
 
-    h1{
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-width: 0;
+    }
+
+    .brandTitle{
       margin:0;
       font-size: 28px;
       letter-spacing: .2px;
+      line-height: 1.05;
+    }
+
+    .brandTitle span{
+      display:block;
+      margin-top: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: .2px;
+      color: var(--muted);
     }
 
     .hint{
-      margin-top:6px;
+      margin-top:0;
       color: var(--muted);
       font-size: 14px;
       line-height: 1.35;
     }
 
     .pill{
-      display:inline-flex;
+      display:flex;
       gap:8px;
-      align-items:center;
+      align-items:flex-start;
       padding:10px 12px;
-      border-radius: 999px;
+      border-radius: 14px;
       border: 1px solid var(--stroke);
-      background: rgba(2,6,23,.35);
+      background: rgba(255,255,255,.045);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       color: var(--muted);
       font-size: 13px;
-      white-space: nowrap;
+      line-height: 1.35;
+      max-width: 420px;
+    }
+
+    .pill b{
+      color: rgba(229,231,235,.92);
+      font-weight: 800;
     }
 
     /* GRID: 2 колонки на широких, 1 колонка на мобиле */
@@ -79,10 +103,13 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
     }
+
     @media (max-width: 720px){
       body{ padding: 16px; }
+      .topbar{ flex-direction: column; }
+      .pill{ width: 100%; max-width: none; }
+      .brandTitle{ font-size: 26px; }
       .grid{ grid-template-columns: 1fr; }
-      h1{ font-size: 24px; }
     }
 
     /* GLASS CARD */
@@ -100,6 +127,7 @@
       transition: transform .16s ease, border-color .16s ease, background .16s ease;
       min-height: 92px;
     }
+
     .card::before{
       content:"";
       position:absolute;
@@ -110,6 +138,7 @@
       opacity: .7;
       pointer-events:none;
     }
+
     .card::after{
       content:"";
       position:absolute;
@@ -118,11 +147,13 @@
       pointer-events:none;
       opacity:.7;
     }
+
     .card:hover{
       transform: translateY(-2px);
       border-color: var(--stroke2);
       background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.05));
     }
+
     .card:active{
       transform: translateY(0px) scale(.995);
     }
@@ -132,7 +163,9 @@
       letter-spacing: .2px;
       line-height: 1.15;
       font-size: 16px;
+      padding-right: 48px; /* чтобы заголовок не залезал под badge */
     }
+
     .subtitle{
       margin-top: 6px;
       color: var(--muted);
@@ -171,6 +204,7 @@
       font-weight: 700;
       user-select:none;
     }
+
     .seasonHead{
       border: 1px solid var(--stroke);
       border-radius: var(--radius);
@@ -183,6 +217,7 @@
       position:relative;
       overflow:hidden;
     }
+
     .seasonHead::before{
       content:"";
       position:absolute;
@@ -213,12 +248,14 @@
       justify-content:space-between;
       gap:12px;
     }
+
     .row:first-child{ border-top:none; }
 
     .rowTitle{
       font-size: 14.5px;
       line-height: 1.3;
     }
+
     .rowMeta{
       font-size: 12px;
       color: var(--muted);
@@ -230,6 +267,7 @@
       text-decoration:none;
       font-weight:700;
     }
+
     a:hover{ text-decoration: underline; }
 
     .empty{
@@ -251,7 +289,7 @@
   async function loadData() {
     const res = await fetch("./data.json", { cache: "no-store" });
     DATA = await res.json();
-    document.title = DATA.appTitle || "Навигатор пути";
+    document.title = "Мария Богиня — подкасты";
   }
 
   function renderHome() {
@@ -265,11 +303,12 @@
 
     document.getElementById("app").innerHTML = `
       <div class="topbar">
-        <div>
-          <h1>${DATA.appTitle || "Навигатор пути"}</h1>
+        <div class="brand">
+          <h1 class="brandTitle">Мария Богиня<span>подкасты</span></h1>
           <div class="hint">Выбирай сезон → открывай видео.</div>
         </div>
-        <div class="pill"> Если вы только подписались: совет - смотрите все видео сначала. </div>
+
+        <div class="pill"><b>Совет:</b> смотрите все видео сначала, не торопитесь.</div>
       </div>
 
       <div class="grid">
