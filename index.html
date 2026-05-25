@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Мария Богиня — подкасты</title>
 
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
   <style>
     :root{
       --bg1:#020617;
@@ -335,6 +337,133 @@
       font-size: 14px;
       padding: 14px;
     }
+
+    /* ---------- SEARCH ---------- */
+    .search{
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .search input{
+      width: 100%;
+      padding: 12px 40px 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(255,255,255,.045);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      transition: border-color .16s ease, background .16s ease;
+    }
+    .search input::placeholder{ color: rgba(229,231,235,.45); }
+    .search input:focus{
+      border-color: var(--stroke2);
+      background: rgba(255,255,255,.07);
+    }
+    .search .clear{
+      position:absolute;
+      top:50%;
+      right:10px;
+      transform: translateY(-50%);
+      width:24px;
+      height:24px;
+      border:none;
+      border-radius:999px;
+      background: rgba(255,255,255,.10);
+      color: var(--muted);
+      cursor:pointer;
+      font-size:14px;
+      line-height:24px;
+      padding:0;
+      display:none;
+    }
+    .search .clear.show{ display:block; }
+
+    /* результаты поиска */
+    .resultHead{
+      color: var(--muted);
+      font-size: 13px;
+      margin: 4px 2px 10px;
+    }
+    .resultSeason{
+      font-size: 12px;
+      color: rgba(56,189,248,.85);
+      white-space: nowrap;
+      margin-right: 10px;
+    }
+
+    /* ---------- PROGRESS ---------- */
+    .progress{
+      margin-top: 10px;
+    }
+    .progress .bar{
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+    .progress .fill{
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(56,189,248,.9), rgba(168,85,247,.9));
+      transition: width .3s ease;
+    }
+    .progress .label{
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* мини-индикатор прогресса на карточке сезона */
+    .cardProgress{
+      margin-top: 10px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+    .cardProgress > span{
+      display:block;
+      height:100%;
+      border-radius:999px;
+      background: linear-gradient(90deg, rgba(56,189,248,.9), rgba(168,85,247,.9));
+    }
+
+    /* чекбокс "просмотрено" */
+    .check{
+      flex: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      border: 1px solid var(--stroke2);
+      background: rgba(255,255,255,.04);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .16s ease, border-color .16s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .check svg{ width: 13px; height: 13px; opacity: 0; transform: scale(.6); transition: opacity .16s ease, transform .16s ease; }
+    .check.on{
+      background: linear-gradient(135deg, rgba(56,189,248,.95), rgba(168,85,247,.9));
+      border-color: transparent;
+    }
+    .check.on svg{ opacity: 1; transform: scale(1); }
+
+    .row.done .rowTitle{
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-color: rgba(255,255,255,.25);
+    }
+    .rowLeft{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-width:0;
+    }
   </style>
 </head>
 
@@ -345,41 +474,138 @@
 
 <script>
   let DATA = null;
+  let FIRST_RENDER = true;            // первый экран рисуем без fade-перехода
 
   const TRANSITION_MS = 220;
+  const WATCHED_KEY = "navigator_watched_v1";
 
-  async function loadData() {
-    const res = await fetch("./data.json", { cache: "no-store" });
-    DATA = await res.json();
-    document.title = "Мария Богиня — подкасты";
+  /* ---------- Telegram WebApp ---------- */
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+
+  function initTelegram() {
+    if (!tg) return;
+    try {
+      tg.ready();
+      tg.expand();
+      // нативная кнопка "Назад" Telegram повторяет переход на главную
+      tg.BackButton.onClick(() => { location.hash = ""; });
+    } catch (e) { /* вне Telegram просто игнорируем */ }
   }
 
+  function syncTelegramBackButton() {
+    if (!tg || !tg.BackButton) return;
+    if (location.hash.startsWith("#season")) tg.BackButton.show();
+    else tg.BackButton.hide();
+  }
+
+  function openLink(url) {
+    // внутри Telegram ссылки t.me лучше открывать нативно
+    if (tg && /^https:\/\/t\.me\//.test(url)) {
+      tg.openTelegramLink(url);
+      return false;          // отменяем переход по <a>
+    }
+    return true;             // в обычном браузере — обычное открытие
+  }
+
+  /* ---------- безопасность: экранирование ---------- */
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+  // допускаем только http(s) ссылки — защита от javascript: и пр.
+  function safeUrl(url) {
+    const u = String(url || "").trim();
+    return /^https?:\/\//i.test(u) ? u : "";
+  }
+
+  /* ---------- прогресс "просмотрено" (localStorage) ---------- */
+  let WATCHED = loadWatched();
+
+  function loadWatched() {
+    try {
+      const raw = localStorage.getItem(WATCHED_KEY);
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch (e) { return new Set(); }
+  }
+  function saveWatched() {
+    try { localStorage.setItem(WATCHED_KEY, JSON.stringify([...WATCHED])); }
+    catch (e) { /* приватный режим и т.п. — просто не сохраняем */ }
+  }
+  // уникальный ключ пункта = id сезона + индекс
+  function itemKey(seasonId, index) { return seasonId + ":" + index; }
+
+  function seasonProgress(season) {
+    const items = season.items || [];
+    const total = items.length;
+    let done = 0;
+    for (let i = 0; i < total; i++) if (WATCHED.has(itemKey(season.id, i))) done++;
+    return { done, total };
+  }
+
+  function toggleWatched(seasonId, index, ev) {
+    if (ev) ev.stopPropagation();
+    const key = itemKey(seasonId, index);
+    if (WATCHED.has(key)) WATCHED.delete(key);
+    else WATCHED.add(key);
+    saveWatched();
+    // перерисовываем текущий сезон без анимации (мгновенно)
+    renderSeason(seasonId);
+  }
+
+  const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+  /* ---------- рендеринг ---------- */
   function setApp(html) {
-    const app = document.getElementById("app");
-    app.innerHTML = html;
+    document.getElementById("app").innerHTML = html;
+  }
+
+  function render() {
+    const fn = () => {
+      if (location.hash.startsWith("#season")) {
+        const id = Number(location.hash.replace("#season", ""));
+        renderSeason(id);
+      } else {
+        renderHome();
+      }
+      syncTelegramBackButton();
+    };
+
+    if (FIRST_RENDER) {
+      FIRST_RENDER = false;
+      fn();
+      return;
+    }
+    transitionTo(fn);
   }
 
   function transitionTo(renderFn) {
     const app = document.getElementById("app");
     app.classList.add("is-leaving");
-
     window.setTimeout(() => {
       renderFn();
-      // принудительный reflow, чтобы анимация точно стартанула
-      void app.offsetHeight;
+      void app.offsetHeight;        // принудительный reflow
       app.classList.remove("is-leaving");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, TRANSITION_MS);
   }
 
   function renderHome() {
-    const seasonsHtml = DATA.seasons.map((s, i) => `
-      <div class="card" style="--d:${i*35}ms" onclick="openSeason(${s.id}, event)" role="button" tabindex="0">
-        <div class="badge">${(s.items && s.items.length) ? s.items.length : 0}</div>
-        <div class="title">${s.title}</div>
-        <div class="subtitle">${s.subtitle || ""}</div>
-      </div>
-    `).join("");
+    const seasonsHtml = DATA.seasons.map((s, i) => {
+      const { done, total } = seasonProgress(s);
+      const pct = total ? Math.round(done / total * 100) : 0;
+      const progressHtml = total ? `
+        <div class="cardProgress"><span style="width:${pct}%"></span></div>
+      ` : "";
+      return `
+        <div class="card" style="--d:${i*35}ms" onclick="openSeason(${s.id}, event)" role="button" tabindex="0">
+          <div class="badge">${done}/${total}</div>
+          <div class="title">${esc(s.title)}</div>
+          <div class="subtitle">${esc(s.subtitle || "")}</div>
+          ${progressHtml}
+        </div>
+      `;
+    }).join("");
 
     setApp(`
       <div class="topbar">
@@ -387,53 +613,72 @@
           <h1 class="brandTitle">Мария Богиня<span>подкасты</span></h1>
           <div class="hint">Выбирай сезон → открывай видео.</div>
         </div>
-
         <div class="pill"><b>Совет:</b> смотрите все видео сначала, не торопитесь.</div>
       </div>
 
-      <div class="grid">
+      <div class="search">
+        <input id="searchInput" type="text" placeholder="Поиск по всем эпизодам…"
+               oninput="onSearch(this.value)" autocomplete="off">
+        <button class="clear" id="searchClear" onclick="clearSearch()" aria-label="Очистить">✕</button>
+      </div>
+
+      <div id="results"></div>
+
+      <div class="grid" id="grid">
         ${seasonsHtml}
       </div>
     `);
   }
 
   function openSeason(id, ev) {
-    // микро-нажатие на карточку (особенно заметно на мобиле)
-    const card = ev?.currentTarget;
+    const card = ev && ev.currentTarget;
     if (card) {
       card.classList.add("is-pressed");
       window.setTimeout(() => card.classList.remove("is-pressed"), 120);
     }
-
-    location.hash = "season" + id;
-    transitionTo(() => renderSeason(id));
+    location.hash = "season" + id;   // навигацию делает hashchange → render()
   }
 
   function renderSeason(id) {
     const season = DATA.seasons.find(s => s.id === id);
-    if (!season) {
-      location.hash = "";
-      return renderHome();
-    }
+    if (!season) { location.hash = ""; return; }
+
+    const { done, total } = seasonProgress(season);
+    const pct = total ? Math.round(done / total * 100) : 0;
 
     const itemsHtml = (season.items || []).map((item, i) => {
-      const hasLink = item.link && item.link.trim().length > 0;
+      const url = safeUrl(item.link);
+      const isDone = WATCHED.has(itemKey(season.id, i));
+      const linkHtml = url
+        ? `<a href="${esc(url)}" target="_blank" rel="noopener"
+              onclick="return openLink('${esc(url)}')">Открыть</a>`
+        : `ссылка позже`;
       return `
-        <div class="row" style="--d:${i*25}ms">
-          <div class="rowTitle">${item.title}</div>
-          <div class="rowMeta">
-            ${hasLink ? `<a href="${item.link}" target="_blank" rel="noopener">Открыть</a>` : `ссылка позже`}
+        <div class="row ${isDone ? "done" : ""}" style="--d:${i*22}ms">
+          <div class="rowLeft">
+            <button class="check ${isDone ? "on" : ""}"
+                    onclick="toggleWatched(${season.id}, ${i}, event)"
+                    aria-label="Отметить просмотренным">${CHECK_SVG}</button>
+            <div class="rowTitle">${esc(item.title)}</div>
           </div>
+          <div class="rowMeta">${linkHtml}</div>
         </div>
       `;
     }).join("");
+
+    const progressHtml = total ? `
+      <div class="progress">
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+        <div class="label">Просмотрено ${done} из ${total}</div>
+      </div>` : "";
 
     setApp(`
       <div class="back" onclick="goBack()">← Все сезоны</div>
 
       <div class="seasonHead">
-        <h2 class="seasonTitle">${season.title}</h2>
-        <div class="seasonSub">${season.subtitle || ""}</div>
+        <h2 class="seasonTitle">${esc(season.title)}</h2>
+        <div class="seasonSub">${esc(season.subtitle || "")}</div>
+        ${progressHtml}
       </div>
 
       <div class="list">
@@ -443,28 +688,111 @@
   }
 
   function goBack() {
-    location.hash = "";
-    transitionTo(() => renderHome());
+    location.hash = "";              // навигацию делает hashchange → render()
+  }
+
+  /* ---------- поиск ---------- */
+  function onSearch(q) {
+    const query = q.trim().toLowerCase();
+    const grid = document.getElementById("grid");
+    const results = document.getElementById("results");
+    const clearBtn = document.getElementById("searchClear");
+    if (!grid || !results) return;
+
+    clearBtn.classList.toggle("show", query.length > 0);
+
+    if (!query) {
+      results.innerHTML = "";
+      grid.style.display = "";
+      return;
+    }
+    grid.style.display = "none";
+
+    const matches = [];
+    DATA.seasons.forEach(s => {
+      (s.items || []).forEach((item, i) => {
+        if (String(item.title).toLowerCase().includes(query)) {
+          matches.push({ season: s, item, index: i });
+        }
+      });
+    });
+
+    if (!matches.length) {
+      results.innerHTML = `<div class="empty">Ничего не найдено по запросу «${esc(q.trim())}».</div>`;
+      return;
+    }
+
+    const rows = matches.map((m, i) => {
+      const url = safeUrl(m.item.link);
+      const isDone = WATCHED.has(itemKey(m.season.id, m.index));
+      const linkHtml = url
+        ? `<a href="${esc(url)}" target="_blank" rel="noopener"
+              onclick="return openLink('${esc(url)}')">Открыть</a>`
+        : `ссылка позже`;
+      const seasonNo = "С" + m.season.id;
+      return `
+        <div class="row ${isDone ? "done" : ""}" style="--d:${Math.min(i,12)*22}ms">
+          <div class="rowLeft">
+            <button class="check ${isDone ? "on" : ""}"
+                    onclick="toggleWatched(${m.season.id}, ${m.index}, event); onSearch(document.getElementById('searchInput').value)"
+                    aria-label="Отметить просмотренным">${CHECK_SVG}</button>
+            <div class="rowTitle">${esc(m.item.title)}</div>
+          </div>
+          <div class="rowMeta">
+            <span class="resultSeason" onclick="openSeasonFromSearch(${m.season.id})">${seasonNo}</span>
+            ${linkHtml}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    results.innerHTML = `
+      <div class="resultHead">Найдено эпизодов: ${matches.length}</div>
+      <div class="list">${rows}</div>
+    `;
+  }
+
+  function clearSearch() {
+    const input = document.getElementById("searchInput");
+    if (input) { input.value = ""; input.focus(); }
+    onSearch("");
+  }
+
+  function openSeasonFromSearch(id) {
+    location.hash = "season" + id;
+  }
+
+  /* ---------- загрузка данных и старт ---------- */
+  async function loadData() {
+    const res = await fetch("./data.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    DATA = await res.json();
+    if (!DATA || !Array.isArray(DATA.seasons)) throw new Error("Некорректный формат data.json");
+    document.title = "Мария Богиня — подкасты";
+  }
+
+  function showError(msg) {
+    setApp(`
+      <div class="seasonHead">
+        <h2 class="seasonTitle">Не удалось загрузить данные</h2>
+        <div class="seasonSub">${esc(msg)}</div>
+      </div>
+      <div class="empty">Проверьте файл data.json и обновите страницу.</div>
+    `);
   }
 
   async function init() {
-    await loadData();
-
-    if (location.hash.startsWith("#season")) {
-      const id = Number(location.hash.replace("#season", ""));
-      renderSeason(id);
-    } else {
-      renderHome();
+    initTelegram();
+    try {
+      await loadData();
+    } catch (e) {
+      showError(e && e.message ? e.message : "Неизвестная ошибка");
+      return;
     }
 
-    window.addEventListener("hashchange", () => {
-      if (location.hash.startsWith("#season")) {
-        const id = Number(location.hash.replace("#season", ""));
-        transitionTo(() => renderSeason(id));
-      } else {
-        transitionTo(() => renderHome());
-      }
-    });
+    render();   // нарисовать стартовый экран по текущему hash
+
+    window.addEventListener("hashchange", render);
   }
 
   init();
